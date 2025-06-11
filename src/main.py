@@ -100,7 +100,8 @@ def main() -> None:
     if not AUTHORIZED_USERS:
         logger.warning("TELEGRAM_CHAT_ID 未设置，机器人将对所有用户开放。")
 
-    updater = Updater(TELEGRAM_BOT_TOKEN)
+    # 使用新的 Builder 模式创建 Updater
+    updater = Updater.builder().token(TELEGRAM_BOT_TOKEN).build()
 
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))

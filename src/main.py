@@ -13,20 +13,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 从环境变量获取配置
-BWH_API_KEY = os.environ.get("BWH_API_KEY")
-# 将 VEID 作为列表读取
-BWH_VEIDS = [veid.strip() for veid in os.environ.get("BWH_VEID", "").split(',') if veid.strip()]
-# 将 Chat ID 作为授权用户列表，用逗号分隔
+# --- 环境变量配置 ---
+# 全新的凭证变量，格式为 "VEID1:API_KEY1;VEID2:API_KEY2"
+BWH_VARS_STR = os.environ.get("BWH_VARS")
+BWH_CREDS = []
+if BWH_VARS_STR:
+    for pair in BWH_VARS_STR.split(';'):
+        if ':' in pair:
+            veid, api_key = pair.split(':', 1)
+            BWH_CREDS.append({'veid': veid.strip(), 'api_key': api_key.strip()})
+
+# 将 Chat ID 作为授权用户列表
 AUTHORIZED_USERS = [int(user_id.strip()) for user_id in os.environ.get("TELEGRAM_CHAT_ID", "").split(',') if user_id.strip()]
 # 定时任务的小时数 (CST)，默认北京时间早上8点
 CRON_HOURS_CST = [int(h.strip()) for h in os.environ.get("CRON_HOURS", "8").split(',') if h.strip().isdigit()]
 
+
 def get_bwh_service_info(veid, api_key):
     """通过搬瓦工 API 获取指定 VEID 的 VPS 服务信息"""
     if not veid or not api_key:
-        logger.error("BWH_VEID 或 BWH_API_KEY 未提供。")
-        return None, "搬瓦工 API 凭证未在环境中设置。"
+        return None, "VEID 或 API Key 未提供。"
 
     url = f"https://api.64clouds.com/v1/getServiceInfo?veid={veid}&api_key={api_key}"
     try:
@@ -40,24 +46,30 @@ def get_bwh_service_info(veid, api_key):
         logger.error(f"请求搬瓦工 API 时发生错误 (VEID: {veid}): {e}")
         return None, f"请求搬瓦工 API 时发生网络错误"
 
+
 def format_bytes(byte_count):
     """将字节数格式化为 GB"""
     if byte_count is None:
         return 0
     return round(byte_count / (1024**3), 2)
 
+
 def _get_formatted_report():
     """获取并格式化所有 VPS 的流量报告 (核心逻辑)"""
-    if not BWH_VEIDS:
-        return "错误: `BWH_VEID` 环境变量未设置或为空。请确保已配置一个或多个 VEID。"
+    if not BWH_CREDS:
+        return "错误: `BWH_VARS` 环境变量未设置或格式不正确。请确保格式为 'VEID1:API_KEY1;VEID2:API_KEY2'。"
 
     report_parts = ["*搬瓦工 VPS 流量总报告*"]
 
-    for veid in BWH_VEIDS:
-        info, error_message = get_bwh_service_info(veid, BWH_API_KEY)
+    for cred in BWH_CREDS:
+        veid = cred['veid']
+        api_key = cred['api_key']
+        info, error_message = get_bwh_service_info(veid, api_key)
+        
         if error_message:
             report_parts.append(f"\n------\n*VPS (VEID: `{veid}`)*\n查询失败: `{error_message}`")
             continue
+        
         if info:
             plan_monthly_data = info.get("plan_monthly_data")
             data_counter = info.get("data_counter")
@@ -74,7 +86,9 @@ def _get_formatted_report():
                 f"流量重置日期: `{data_next_reset}`"
             )
             report_parts.append(part)
+            
     return "\n".join(report_parts)
+
 
 def start(update: Update, context: CallbackContext) -> None:
     """响应 /start 命令"""
@@ -89,6 +103,7 @@ def start(update: Update, context: CallbackContext) -> None:
         f'机器人已配置定时推送，具体时间请咨询管理员。'
     )
 
+
 def get_traffic_info(update: Update, context: CallbackContext) -> None:
     """响应 /traffic 命令，查询并发送所有 VPS 的流量信息"""
     user = update.effective_user
@@ -102,6 +117,7 @@ def get_traffic_info(update: Update, context: CallbackContext) -> None:
     context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
     update.message.reply_text(final_report, parse_mode='Markdown')
 
+
 def send_scheduled_report(context: CallbackContext):
     """由调度器调用的函数，用于发送定时报告"""
     job = context.job
@@ -110,10 +126,11 @@ def send_scheduled_report(context: CallbackContext):
     final_report = _get_formatted_report()
     context.bot.send_message(chat_id=chat_id, text=final_report, parse_mode='Markdown')
 
+
 def main() -> None:
     """启动机器人并设置定时任务"""
-    if not all([BWH_API_KEY, os.environ.get("TELEGRAM_BOT_TOKEN"), AUTHORIZED_USERS]):
-        logger.error("错误: 缺少必要的环境变量。请检查 BWH_API_KEY, TELEGRAM_BOT_TOKEN, 和 TELEGRAM_CHAT_ID。")
+    if not all([BWH_VARS_STR, os.environ.get("TELEGRAM_BOT_TOKEN"), AUTHORIZED_USERS]):
+        logger.error("错误: 缺少必要的环境变量。请检查 BWH_VARS, TELEGRAM_BOT_TOKEN, 和 TELEGRAM_CHAT_ID。")
         exit(1)
 
     updater = Updater(os.environ.get("TELEGRAM_BOT_TOKEN"), use_context=True)
@@ -123,20 +140,20 @@ def main() -> None:
     
     # --- 设置定时任务 ---
     scheduler = BackgroundScheduler(timezone=pytz.timezone('Asia/Shanghai'))
-    if AUTHORIZED_USERS and CRON_HOURS_CST:
+    if BWH_CREDS and AUTHORIZED_USERS and CRON_HOURS_CST:
         for chat_id in AUTHORIZED_USERS:
             for hour in CRON_HOURS_CST:
                 scheduler.add_job(
                     send_scheduled_report,
                     'cron',
                     hour=hour,
-                    context=chat_id  # 传递 chat_id
+                    context=chat_id
                 )
                 logger.info(f"已为 chat_id: {chat_id} 添加了一个北京时间 {hour}:00 的定时任务。")
         scheduler.start()
     
     updater.start_polling()
-    logger.info("机器人已启动，支持手动查询和定时推送。")
+    logger.info("机器人已启动，支持多 VPS (VEID:API_KEY) 查询。")
     updater.idle()
 
 if __name__ == '__main__':

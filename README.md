@@ -21,26 +21,32 @@ Bandwagon Traffic Monitor Bot (搬瓦工流量监控机器人) 是一个通过 T
 
 您需要准备以下信息：
 
-- **搬瓦工 VEID 和 API Key**: 登录 [KiwiVM 控制面板](https://kiwivm.64clouds.com/)，在 API 页面可以找到。
+- **搬瓦工 VEID 和 API Key**: 您需要为**每一台**希望监控的 VPS，都从 [KiwiVM 控制面板](https://kiwivm.64clouds.com/) 的 API 页面找到对应的 VEID 和 API Key。
 - **Telegram Bot Token**: 在 Telegram 中与 [@BotFather](https://t.me/BotFather) 对话，创建一个新的 Bot，即可获得 Token。
 - **Telegram Chat ID**: 这是您的个人 Telegram ID。您可以发送 `/start` 给 [@userinfobot](https://t.me/userinfobot) 来获取。如果您希望多个用户都能使用，可以用逗号 `,` 分隔多个 ID。
 
 ### 2. 运行 Docker 容器
 
-在您的服务器上执行以下命令来启动机器人。请将命令中的占位符替换为您在上一步中获取到的真实信息。
+在您的服务器上执行以下命令来启动机器人。请注意全新的 `BWH_VARS` 环境变量格式。
 
+**`BWH_VARS` 格式说明:**
+- 每一组凭证的格式为 `VEID:API_KEY`。
+- 多组凭证之间请用**分号** `;` 隔开。
+
+**示例命令:**
 ```bash
 docker run -d \
   --name bandwagon-bot \
   --restart always \
-  -e BWH_VEID="YOUR_BWH_VEID" \
-  -e BWH_API_KEY="YOUR_BWH_API_KEY" \
+  -e BWH_VARS="VEID1:APIKEY1;VEID2:APIKEY2;VEID3:APIKEY3" \
   -e TELEGRAM_BOT_TOKEN="YOUR_TELEGRAM_BOT_TOKEN" \
   -e TELEGRAM_CHAT_ID="YOUR_TELEGRAM_CHAT_ID" \
+  -e CRON_HOURS="8,20" \
   your_dockerhub_username/bandwagon-traffic-monitor:latest
 ```
 
 > **注意**:
+> - 将 `VEID1:APIKEY1;...` 替换为您自己的真实凭证。
 > - 请将 `your_dockerhub_username` 替换为您自己的 Docker Hub 用户名。如果您是从零开始并使用了我提供的 GitHub Actions 流程，镜像标签就是这样。
 > - 如果您是直接克隆本仓库在本地构建，可以将最后一行替换为本地镜像的名称。
 
@@ -49,7 +55,7 @@ docker run -d \
 打开 Telegram，找到您创建的机器人，然后发送以下命令：
 
 - `/start` - 显示欢迎信息。
-- `/traffic` - 获取实时的 VPS 流量报告。
+- `/traffic` - 获取您配置的所有 VPS 的实时流量报告。
 
 ## 🔧 环境变量
 
@@ -57,8 +63,7 @@ docker run -d \
 
 | 变量名                | 描述                                                               | 是否必须 |
 | --------------------- | ------------------------------------------------------------------ | -------- |
-| `BWH_VEID`            | 您的搬瓦工 VPS 的 VEID。**支持多个 VEID，请用逗号 `,` 分隔**。      | **是**   |
-| `BWH_API_KEY`         | 您的搬瓦工 API 密钥。                                              | **是**   |
+| `BWH_VARS`            | VPS 凭证。格式为 `VEID1:API_KEY1;VEID2:API_KEY2`。                   | **是**   |
 | `TELEGRAM_BOT_TOKEN`  | 您的 Telegram Bot 的 Token。                                       | **是**   |
 | `TELEGRAM_CHAT_ID`    | 授权使用机器人的用户 Chat ID，多个 ID 请用逗号分隔。               | **是**   |
 | `CRON_HOURS`          | 定时推送的小时数 (北京时间, 24小时制)，多个请用逗号分隔。默认 `8`。   | 否       |

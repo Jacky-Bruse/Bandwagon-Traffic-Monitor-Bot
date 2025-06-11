@@ -2,7 +2,7 @@ import os
 import requests
 import datetime
 import logging
-from telegram import Update, ForceReply
+from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
 # 启用日志记录
@@ -49,9 +49,9 @@ def start(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("抱歉，您无权使用此机器人。")
         return
 
-    update.message.reply_markdown_v2(
-        fr'你好，{user.mention_markdown_v2()}\! '
-        fr'使用 /traffic 命令来查询搬瓦工 VPS 的实时流量信息。'
+    update.message.reply_markdown(
+        f'你好，{user.mention_markdown()}! '
+        f'使用 /traffic 命令来查询搬瓦工 VPS 的实时流量信息。'
     )
 
 def get_traffic_info(update: Update, context: CallbackContext) -> None:
@@ -79,8 +79,9 @@ def get_traffic_info(update: Update, context: CallbackContext) -> None:
         
         usage_percent = round((data_counter / plan_monthly_data) * 100, 2) if plan_monthly_data > 0 else 0
 
+        # 使用旧版 Markdown 格式，手动添加反引号
         message = (
-            f"**搬瓦工 VPS 流量报告**\n\n"
+            f"*搬瓦工 VPS 流量报告*\n\n"
             f"主机名: `{info.get('hostname')}`\n"
             f"套餐: `{info.get('plan')}`\n\n"
             f"已用流量: `{used_gb} GB`\n"
@@ -100,8 +101,8 @@ def main() -> None:
     if not AUTHORIZED_USERS:
         logger.warning("TELEGRAM_CHAT_ID 未设置，机器人将对所有用户开放。")
 
-    # 使用新的 Builder 模式创建 Updater
-    updater = Updater.builder().token(TELEGRAM_BOT_TOKEN).build()
+    # 使用 v13.x 的方式初始化 Updater
+    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
 
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))

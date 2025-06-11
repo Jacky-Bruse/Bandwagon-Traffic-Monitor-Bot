@@ -65,7 +65,10 @@ def get_traffic_info(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("错误: `BWH_VEID` 环境变量未设置或为空。请确保已配置一个或多个 VEID。")
         return
 
-    update.message.reply_text("正在查询所有 VPS 的流量信息，请稍候...")
+    # 发送等待消息并获取其 message_id
+    sent_message = update.message.reply_text("正在查询所有 VPS 的流量信息，请稍候...")
+    message_id_to_delete = sent_message.message_id
+    chat_id = update.message.chat_id
 
     report_parts = ["*搬瓦工 VPS 流量总报告*"]
 
@@ -97,6 +100,11 @@ def get_traffic_info(update: Update, context: CallbackContext) -> None:
             report_parts.append(part)
 
     final_report = "\n".join(report_parts)
+
+    # 删除等待消息
+    context.bot.delete_message(chat_id=chat_id, message_id=message_id_to_delete)
+
+    # 发送最终报告
     update.message.reply_text(final_report, parse_mode='Markdown')
 
 def main() -> None:

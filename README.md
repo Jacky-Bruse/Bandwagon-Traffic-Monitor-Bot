@@ -1,2 +1,96 @@
-# Bandwagon-Traffic-Monitor-Bot
-Bandwagon Traffic Monitor Bot (搬瓦工流量监控机器人) 这是一个通过 GitHub Actions 自动化监控搬瓦工 (Bandwagon Host) VPS 流量，并将结果通过 Telegram Bot 推送通知的项目。同时，工作流会自动构建应用的 Docker 镜像并推送到 Docker Hub。
+# Bandwagon Traffic Monitor Bot
+
+Bandwagon Traffic Monitor Bot (搬瓦工流量监控机器人) 是一个通过 Telegram Bot 实时查询搬瓦工 (Bandwagon Host) VPS 流量的工具。
+
+本项目被打包为 Docker 镜像，您可以轻松地在自己的服务器上部署。它会作为一个后台服务运行，响应您在 Telegram 中发送的命令。
+
+当代码被推送到 `main` 分支时，GitHub Actions 会自动构建新的 Docker 镜像并将其推送到 Docker Hub。
+
+## ✨ 功能
+
+- **交互式查询**: 通过向 Telegram Bot 发送 `/traffic` 命令，随时获取 VPS 的实时流量使用情况。
+- **权限控制**: 可配置一个或多个授权的 Telegram Chat ID，只有授权用户才能使用此机器人。
+- **Docker 化**: 项目被容器化，方便快速部署和管理。
+- **自动化构建**: 通过 GitHub Actions 自动构建和推送 Docker 镜像。
+
+## 🚀 快速开始
+
+您需要一台可以运行 Docker 的服务器来部署此机器人。
+
+### 1. 获取必要的凭证
+
+您需要准备以下信息：
+
+- **搬瓦工 VEID 和 API Key**: 登录 [KiwiVM 控制面板](https://kiwivm.64clouds.com/)，在 API 页面可以找到。
+- **Telegram Bot Token**: 在 Telegram 中与 [@BotFather](https://t.me/BotFather) 对话，创建一个新的 Bot，即可获得 Token。
+- **Telegram Chat ID**: 这是您的个人 Telegram ID。您可以发送 `/start` 给 [@userinfobot](https://t.me/userinfobot) 来获取。如果您希望多个用户都能使用，可以用逗号 `,` 分隔多个 ID。
+
+### 2. 运行 Docker 容器
+
+在您的服务器上执行以下命令来启动机器人。请将命令中的占位符替换为您在上一步中获取到的真实信息。
+
+```bash
+docker run -d \
+  --name bandwagon-bot \
+  --restart always \
+  -e BWH_VEID="YOUR_BWH_VEID" \
+  -e BWH_API_KEY="YOUR_BWH_API_KEY" \
+  -e TELEGRAM_BOT_TOKEN="YOUR_TELEGRAM_BOT_TOKEN" \
+  -e TELEGRAM_CHAT_ID="YOUR_TELEGRAM_CHAT_ID" \
+  your_dockerhub_username/bandwagon-traffic-monitor:latest
+```
+
+> **注意**:
+> - 请将 `your_dockerhub_username` 替换为您自己的 Docker Hub 用户名。如果您是从零开始并使用了我提供的 GitHub Actions 流程，镜像标签就是这样。
+> - 如果您是直接克隆本仓库在本地构建，可以将最后一行替换为本地镜像的名称。
+
+### 3. 与您的机器人互动
+
+打开 Telegram，找到您创建的机器人，然后发送以下命令：
+
+- `/start` - 显示欢迎信息。
+- `/traffic` - 获取实时的 VPS 流量报告。
+
+## 🔧 环境变量
+
+以下是运行此机器人所需的所有环境变量：
+
+| 变量名                | 描述                                                               | 是否必须 |
+| --------------------- | ------------------------------------------------------------------ | -------- |
+| `BWH_VEID`            | 您的搬瓦工 VPS 的 VEID。                                           | **是**   |
+| `BWH_API_KEY`         | 您的搬瓦工 API 密钥。                                              | **是**   |
+| `TELEGRAM_BOT_TOKEN`  | 您的 Telegram Bot 的 Token。                                       | **是**   |
+| `TELEGRAM_CHAT_ID`    | 授权使用机器人的用户 Chat ID，多个 ID 请用逗号分隔。               | **是**   |
+
+## 🐳 Docker & 自动化
+
+### 在本地构建
+
+如果您想在本地构建 Docker 镜像，而不是使用 GitHub Actions 推送的镜像，可以执行以下操作：
+
+1. 克隆本仓库：
+   ```bash
+   git clone https://github.com/your-username/Bandwagon-Traffic-Monitor-Bot.git
+   cd Bandwagon-Traffic-Monitor-Bot
+   ```
+2. 构建 Docker 镜像：
+   ```bash
+   docker build -t bandwagon-traffic-monitor:local .
+   ```
+3. 使用本地镜像运行容器（记得替换环境变量）：
+   ```bash
+   docker run -d --name bandwagon-bot -e ... bandwagon-traffic-monitor:local
+   ```
+
+### 自动化工作流
+
+本仓库包含一个 GitHub Actions 工作流 (`.github/workflows/monitor.yml`)，它会在每次有代码推送到 `main` 分支时，自动执行以下操作：
+
+1. 登录到 Docker Hub。
+2. 构建新的 Docker 镜像。
+3. 将镜像标记为 `latest` 并推送到您的 Docker Hub 仓库。
+
+要使此工作流正常工作，您需要在 GitHub 仓库的 `Settings` > `Secrets and variables` > `Actions` 中设置以下两个 secret：
+
+- `DOCKER_USERNAME`: 您的 Docker Hub 用户名。
+- `DOCKER_PASSWORD`: 您的 Docker Hub 密码或访问令牌。

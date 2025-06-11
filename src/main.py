@@ -3,9 +3,11 @@ import requests
 import datetime
 import logging
 import pytz
-from telegram import Update
+from telegram import Update, Bot
 from telegram.ext import Updater, CommandHandler, CallbackContext
 from apscheduler.schedulers.background import BackgroundScheduler
+from telegram.error import TelegramError
+from telegram import ParseMode
 
 # 启用日志记录
 logging.basicConfig(
@@ -118,13 +120,15 @@ def get_traffic_info(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(final_report, parse_mode='Markdown')
 
 
-def send_scheduled_report(context: CallbackContext):
+def send_traffic_report(bot: Bot, chat_id: int):
     """由调度器调用的函数，用于发送定时报告"""
-    job = context.job
-    chat_id = job.context
     logger.info(f"正在为 chat_id: {chat_id} 执行定时任务...")
-    final_report = _get_formatted_report()
-    context.bot.send_message(chat_id=chat_id, text=final_report, parse_mode='Markdown')
+    try:
+        final_report = _get_formatted_report()
+        bot.send_message(chat_id=chat_id, text=final_report, parse_mode='Markdown')
+        logger.info(f"已成功向 chat_id: {chat_id} 发送定时报告。")
+    except Exception as e:
+        logger.error(f"向 chat_id: {chat_id} 发送定时报告失败: {e}")
 
 
 def main() -> None:
@@ -139,15 +143,15 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("traffic", get_traffic_info))
     
     # --- 设置定时任务 ---
-    scheduler = BackgroundScheduler(timezone=pytz.timezone('Asia/Shanghai'))
     if BWH_CREDS and AUTHORIZED_USERS and CRON_HOURS_CST:
+        scheduler = BackgroundScheduler(timezone=pytz.timezone('Asia/Shanghai'))
         for chat_id in AUTHORIZED_USERS:
             for hour in CRON_HOURS_CST:
                 scheduler.add_job(
-                    send_scheduled_report,
+                    send_traffic_report,
                     'cron',
                     hour=hour,
-                    context=chat_id
+                    kwargs={'bot': updater.bot, 'chat_id': chat_id}
                 )
                 logger.info(f"已为 chat_id: {chat_id} 添加了一个北京时间 {hour}:00 的定时任务。")
         scheduler.start()

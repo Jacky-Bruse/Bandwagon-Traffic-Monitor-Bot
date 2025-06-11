@@ -61,6 +61,7 @@ docker run -d \
 | `BWH_API_KEY`         | 您的搬瓦工 API 密钥。                                              | **是**   |
 | `TELEGRAM_BOT_TOKEN`  | 您的 Telegram Bot 的 Token。                                       | **是**   |
 | `TELEGRAM_CHAT_ID`    | 授权使用机器人的用户 Chat ID，多个 ID 请用逗号分隔。               | **是**   |
+| `CRON_HOURS`          | 定时推送的小时数 (北京时间, 24小时制)，多个请用逗号分隔。默认 `8`。   | 否       |
 
 ## 🐳 Docker & 自动化
 

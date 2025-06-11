@@ -3,7 +3,7 @@ import requests
 import datetime
 import logging
 from telegram import Update, ForceReply
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, CallbackContext
 
 # 启用日志记录
 logging.basicConfig(

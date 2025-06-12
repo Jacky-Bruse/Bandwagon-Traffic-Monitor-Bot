@@ -56,6 +56,43 @@ def format_bytes(byte_count):
     return round(byte_count / (1024**3), 2)
 
 
+def create_progress_bar(percentage, width=12):
+    """
+    Creates a text-based progress bar.
+    Example: [████▍·······]
+    """
+    if percentage <= 0:
+        return f"[{'·' * width}]"
+    if percentage >= 100:
+        return f"[{'█' * width}]"
+
+    progress_ratio = percentage / 100.0
+    filled_count = progress_ratio * width
+    
+    full_blocks = int(filled_count)
+    
+    # partial_blocks represents 1/8 to 7/8 of a block
+    partial_blocks = ['▏', '▎', '▍', '▌', '▋', '▊', '▉']
+    
+    partial_amount = filled_count - full_blocks
+    partial_index = int(partial_amount * 8)
+    
+    bar = '█' * full_blocks
+    
+    if full_blocks < width:
+        if partial_index > 0 and partial_index <= len(partial_blocks):
+            bar += partial_blocks[partial_index - 1]
+        elif full_blocks == 0 and percentage > 0:
+            # For very small percentages, show the smallest possible bar
+            bar += '▏'
+
+    empty_char = '·'
+    empty_count = width - len(bar)
+    bar += empty_char * empty_count
+
+    return f"[{bar}]"
+
+
 def _get_formatted_report():
     """获取并格式化所有 VPS 的流量报告 (核心逻辑)"""
     if not BWH_CREDS:
@@ -76,16 +113,23 @@ def _get_formatted_report():
             plan_monthly_data = info.get("plan_monthly_data")
             data_counter = info.get("data_counter")
             data_next_reset = datetime.datetime.fromtimestamp(info.get("data_next_reset")).strftime('%Y-%m-%d')
+            
             used_gb = format_bytes(data_counter)
             total_gb = format_bytes(plan_monthly_data)
-            usage_percent = round((data_counter / plan_monthly_data) * 100, 2) if plan_monthly_data > 0 else 0
+            
+            usage_percent = 0
+            if plan_monthly_data and data_counter and plan_monthly_data > 0:
+                usage_percent = round((data_counter / plan_monthly_data) * 100, 2)
+            
+            progress_bar = create_progress_bar(usage_percent)
+
             part = (
                 f"\n------\n"
-                f"*主机:* `{info.get('hostname')}`\n"
-                f"*套餐:* `{info.get('plan')}`\n"
-                f"已用流量: `{used_gb} GB` / `{total_gb} GB`\n"
-                f"使用率: `{usage_percent}%`\n"
-                f"流量重置日期: `{data_next_reset}`"
+                f"🖥️ *主机:* `{info.get('hostname')}`\n"
+                f"📦 *套餐:* `{info.get('plan')}`\n"
+                f"📈 *流量:* `{used_gb} GB` / `{total_gb} GB`\n"
+                f"📊 *使用率:* {progress_bar} `{usage_percent}%`\n"
+                f"📅 *重置日期:* `{data_next_reset}`"
             )
             report_parts.append(part)
             
@@ -131,6 +175,25 @@ def send_traffic_report(bot: Bot, chat_id: int):
         logger.error(f"向 chat_id: {chat_id} 发送定时报告失败: {e}")
 
 
+def send_startup_notification(bot: Bot, chat_id: int):
+    """在机器人启动时发送通知。"""
+    logger.info(f"正在向 chat_id: {chat_id} 发送启动通知...")
+    try:
+        cst = pytz.timezone('Asia/Shanghai')
+        now = datetime.datetime.now(cst).strftime('%Y-%m-%d %H:%M:%S')
+        
+        message = (
+            "✅ *机器人部署成功*\n\n"
+            f"我已于北京时间 `{now}` 成功启动或重启，\n"
+            f"现在可以接收您的命令了。\n\n"
+            f"使用 /traffic 来查询流量吧！"
+        )
+        bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
+        logger.info(f"已成功向 chat_id: {chat_id} 发送启动通知。")
+    except Exception as e:
+        logger.error(f"向 chat_id: {chat_id} 发送启动通知失败: {e}")
+
+
 def main() -> None:
     """启动机器人并设置定时任务"""
     if not all([BWH_VARS_STR, os.environ.get("TELEGRAM_BOT_TOKEN"), AUTHORIZED_USERS]):
@@ -158,6 +221,11 @@ def main() -> None:
     
     updater.start_polling()
     logger.info("机器人已启动，支持多 VPS (VEID:API_KEY) 查询。")
+
+    # --- 发送启动通知给所有授权用户 ---
+    for chat_id in AUTHORIZED_USERS:
+        send_startup_notification(updater.bot, chat_id)
+
     updater.idle()
 
 if __name__ == '__main__':

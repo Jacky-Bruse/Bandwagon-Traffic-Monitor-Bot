@@ -93,6 +93,24 @@ def create_progress_bar(percentage, width=12):
     return f"[{bar}]"
 
 
+def _get_cycle_start_date(end_date):
+    """根据周期结束日期估算周期开始日期（按月计）。"""
+    # 移动到结束日期所在月份的第一天
+    first_day_of_end_month = end_date.replace(day=1)
+    # 再往前推一天，得到上个月的最后一天
+    last_day_of_previous_month = first_day_of_end_month - datetime.timedelta(days=1)
+    
+    try:
+        # 尝试将日期设置为与结束日期相同的“日”
+        start_date = last_day_of_previous_month.replace(day=end_date.day)
+    except ValueError:
+        # 如果“日”无效（例如，尝试从3月31日回到2月31日），
+        # 则将开始日期定为上个月的最后一天（例如，2月28日或29日）。
+        start_date = last_day_of_previous_month
+        
+    return start_date
+
+
 def _get_formatted_report():
     """获取并格式化所有 VPS 的流量报告 (核心逻辑)"""
     if not BWH_CREDS:
@@ -112,8 +130,25 @@ def _get_formatted_report():
         if info:
             plan_monthly_data = info.get("plan_monthly_data")
             data_counter = info.get("data_counter")
-            data_next_reset = datetime.datetime.fromtimestamp(info.get("data_next_reset")).strftime('%Y-%m-%d')
+            data_next_reset_ts = info.get("data_next_reset")
+            data_next_reset_str = datetime.datetime.fromtimestamp(data_next_reset_ts).strftime('%Y-%m-%d')
             
+            # --- 计算时间进度 ---
+            time_percent = 0.0
+            if data_next_reset_ts:
+                utc_tz = pytz.utc
+                reset_date_utc = datetime.datetime.fromtimestamp(data_next_reset_ts, tz=utc_tz)
+                start_date_utc = _get_cycle_start_date(reset_date_utc)
+                now_utc = datetime.datetime.now(utc_tz)
+                
+                cycle_duration = (reset_date_utc - start_date_utc).total_seconds()
+                elapsed_time = (now_utc - start_date_utc).total_seconds()
+
+                if cycle_duration > 0:
+                    raw_time_percent = (elapsed_time / cycle_duration) * 100
+                    # 将结果限制在 0-100 之间，并保留一位小数
+                    time_percent = round(max(0, min(100, raw_time_percent)), 1)
+
             used_gb = format_bytes(data_counter)
             total_gb = format_bytes(plan_monthly_data)
             
@@ -128,8 +163,8 @@ def _get_formatted_report():
                 f"🖥️ *主机:* `{info.get('hostname')}`\n"
                 f"📦 *套餐:* `{info.get('plan')}`\n"
                 f"📈 *流量:* `{used_gb} GB` / `{total_gb} GB`\n"
-                f"📊 *使用率:* {progress_bar} `{usage_percent}%`\n"
-                f"📅 *重置日期:* `{data_next_reset}`"
+                f"📊 *使用率:* {progress_bar} `{usage_percent}%` (⏳: `{time_percent}%`)\n"
+                f"📅 *重置日期:* `{data_next_reset_str}`"
             )
             report_parts.append(part)
             

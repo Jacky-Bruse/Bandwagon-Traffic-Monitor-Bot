@@ -116,7 +116,7 @@ def _get_formatted_report():
     if not BWH_CREDS:
         return "错误: `BWH_VARS` 环境变量未设置或格式不正确。请确保格式为 'VEID1:API_KEY1;VEID2:API_KEY2'。"
 
-    report_parts = ["*搬瓦工 VPS 流量总报告*"]
+    report_parts = ["*VPS 流量总报告*"]
 
     for cred in BWH_CREDS:
         veid = cred['veid']
@@ -161,7 +161,6 @@ def _get_formatted_report():
             part = (
                 f"\n------\n"
                 f"🖥️ *主机:* `{info.get('hostname')}`\n"
-                f"📦 *套餐:* `{info.get('plan')}`\n"
                 f"📈 *流量:* `{used_gb} GB` / `{total_gb} GB`\n"
                 f"📊 *使用率:* {progress_bar} `{usage_percent}%` (⏳: `{time_percent}%`)\n"
                 f"📅 *重置日期:* `{data_next_reset_str}`"

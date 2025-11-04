@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  bandwagon-bot:
+    image: your_dockerhub_username/bandwagon-traffic-monitor:latest
+    container_name: bandwagon-traffic-monitor
+    restart: unless-stopped
+    environment:
+      # 搬瓦工 VPS 凭证，格式: VEID1:API_KEY1;VEID2:API_KEY2
+      - BWH_VARS=123456:your_api_key_1;789012:your_api_key_2
+      # Telegram Bot Token
+      - TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+      # Telegram Chat ID (多个用逗号分隔)
+      - TELEGRAM_CHAT_ID=your_chat_id
+      # 定时推送的小时数 (北京时间，24小时制，多个用逗号分隔)
+      - CRON_HOURS=8,20
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
